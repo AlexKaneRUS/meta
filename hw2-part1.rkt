@@ -8,6 +8,9 @@
 (provide interpret-expr)
 (provide first-futamura)
 (provide tm-example)
+(provide tm-example-1)
+
+(provide tm-example-2)
 
 (provide filter-vars)
 (provide create-label)
@@ -150,10 +153,20 @@
                       (left)
                       (left)
                       (write 0)))
+                      
+(define (tm-example-1) '((if 0 goto 3)
+                        (right)
+                        (goto 0)
+                        (write 1)))
+                        
+(define (tm-example-2) '(((if 0 goto 3)
+                        (right)
+                        (goto 0)
+                        (write 1)) (1 1 0 1 1)))
 
 (define (first-futamura program) (interpret (mix) (list
                                                    (tm-interpreter)
-                                                   (cons '(instructions index instr-ind next-instr) '(tape-pos cur-val tape-neg))
+                                                   (cons '(instructions next-instr instr-ind) '(index tape-pos cur-val tape-neg))
                                                    (list (cons 'instructions program)))))
 
 ; Example of how to run first futamura projection:
