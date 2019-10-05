@@ -1,6 +1,7 @@
 #lang racket
 
 (require racket/trace)
+(require racket/format)
 (require "hw1.rkt")
 
 (provide interpret)
@@ -9,8 +10,7 @@
 (provide first-futamura)
 (provide tm-example)
 (provide tm-example-1)
-
-(provide tm-example-2)
+(provide pretty-print)
 
 (provide filter-vars)
 (provide create-label)
@@ -117,6 +117,20 @@
 (define (my-trace x y) x)
 (trace my-trace)
 
+(define (pretty-print-block block map-of-names)
+  (let ([new-name (hash-ref map-of-names (car block))]
+        [new-last (map (lambda (arg) (if (hash-has-key? map-of-names arg) (hash-ref map-of-names arg) arg)) (last block))]
+       ) (cons new-name (append (reverse (cdr (reverse (cdr block)))) (list new-last))))
+)
+
+(define (pretty-print program)
+  (let ([read-block (car program)]
+        [names (map (lambda (arg) (car arg)) (cdr program))]
+        [new-names (map (lambda (arg) (string-append "label" (~v arg))) (stream->list (in-range 0 (length (cdr program)) 1)))])
+       (let ([map-of-names (make-immutable-hash (zip names new-names))])
+        (cons read-block (map (lambda (arg) (pretty-print-block arg map-of-names)) (cdr program)))))
+)
+
 ;(interpret (mix) (list (assign-program) (cons '(y) '(x)) (list (cons 'y 42)))) — '((main #hash((x . +) (y . 42))) (return x))
 ;(interpret (mix) (list (find-name) (cons '(name namelist) '(valuelist)) (list (cons 'name 'alex) (cons 'namelist '(al al alex ke a))))) — ((read valuelist) ((search #hash((name . alex) (namelist . (al al alex ke a)))) (valuelist := cdr valuelist) (valuelist := cdr valuelist) (return car valuelist)))
 
@@ -158,16 +172,16 @@
                         (right)
                         (goto 0)
                         (write 1)))
-                        
-(define (tm-example-2) '(((if 0 goto 3)
-                        (right)
-                        (goto 0)
-                        (write 1)) (1 1 0 1 1)))
 
-(define (first-futamura program) (interpret (mix) (list
+(define (first-futamura program) (pretty-print (interpret (mix) (list
                                                    (tm-interpreter)
-                                                   (cons '(instructions next-instr instr-ind) '(index tape-pos cur-val tape-neg))
-                                                   (list (cons 'instructions program)))))
+                                                   (cons '(Q Qtail Instruction Operator Symbol NextLabel) '(Right Left))
+                                                   (list (cons 'Q program))))))
+                                                   
+(define (second-futamura program) (pretty-print (interpret (mix) (list
+                                                  (tm-interpreter)
+                                                  (cons '(Q Qtail Instruction Operator Symbol NextLabel) '(Right Left))
+                                                  (list (cons 'Q program))))))                                                   
 
 ; Example of how to run first futamura projection:
 ;     (define (mixed) (first-futamura (tm-example)))
