@@ -72,7 +72,7 @@
       [ `,x (let ([found (findf (lambda (arg) (equal? (car arg) x)) state)])
               (if found (cdr found) x))]))
 
-;(trace interpret-expr)
+; (trace interpret-expr)
 
 (define (my-trace x) x)
 (trace my-trace)
