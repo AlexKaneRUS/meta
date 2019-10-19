@@ -34,18 +34,42 @@
   )
 
 (define (quote-res l) (cons 'quote (list l)))
-
+  
 (define (reduce expr vs)
+  (match expr 
+    [`(,x) (list (car (reduce-back x vs)))]
+    [_ (car (reduce-back expr vs))]
+  )
+)
+
+(define (reduce-back expr vs)
   (match expr
-    [`(quote . ,args) expr]
-    [`(if . ,args) (list 'if (reduce (car args) vs) (reduce (car (cdr args)) vs) (reduce (car (cdr (cdr args))) vs))]
-    [`(,op . ,args) (let ([real-args (map (lambda (arg) (reduce arg vs)) args)])
-                      (cons op real-args))]
+    [`(quote . ,args) (cons expr #t)]
+    [`(if . ,args) 
+      (let ([arg1 (reduce-back (car args) vs)]
+            [arg2 (reduce-back (cadr args) vs)]
+            [arg3 (reduce-back (caddr args) vs)])
+           (if (and (cdr arg1) (and (cdr arg2) (cdr arg3))) 
+            (cons (interpret-if (hash->list vs) (list 'if (car arg1) (car arg2) (car arg3))) #t) 
+            (cons (list 'if (car arg1) (car arg2) (car arg3)) #f))
+      )]
+    [`(,op . ,args) (let 
+      ([real-args (map (lambda (arg) (reduce-back arg vs)) args)])
+      (if (andmap identity (map (lambda (arg) (cdr arg)) real-args)) 
+        (cons (interpret-if (hash->list vs) (cons op (map (lambda (arg) (car arg)) real-args))) #t) 
+        (cons (cons op (map (lambda (arg) (car arg)) real-args)) #f)))]
     [`,x (let ([found (hash-has-key? vs x)])
-              (if found (quote-res (hash-ref vs x)) x))])
+              (if found (cons (quote-res (hash-ref vs x)) #t) (cons x #f)))])
   )
 
-;(trace reduce)
+(define (interpret-if state expr) 
+ (match expr
+  [`(quote . _) expr]
+  [_ (quote-res (interpret-expr state expr))]
+ )
+)
+
+; (trace reduce)
 
 (define (is-static expr static)
   (match expr
@@ -93,7 +117,7 @@
                 (process-assign (if (is-static (car command) static) goto update-vs goto extend-code-assign))
                 (update-vs (vs := hash-set vs (car command) (interpret-expr (hash->list vs) (list-to-val (cdr (cdr command)))))
                            (goto while-bb))
-                (extend-code-assign (code := append code (list (append (list (car command) :=) (reduce (list-to-val (cdr (cdr command))) vs))))
+                (extend-code-assign (code := append code (list (append (list (car command) ':=) (reduce (cdr (cdr command)) vs))))
                                     (goto while-bb))
                 (case-goto (if (equal? (car command) 'goto) goto process-goto goto case-if))
                 (process-goto (bb := hash-ref program (cadr command) ())
@@ -111,12 +135,12 @@
                                               (set-union pending (list->set (list (cons (fourth command) vs) (cons (sixth command) vs))))
                                               marked)
                                      (code := append code (list (append
-                                                           (append (list if) (list (reduce (second command) vs)))
-                                                           (list goto (create-label (fourth command) vs) goto (create-label (sixth command) vs))
+                                                           (append (list 'if) (list (reduce (second command) vs)))
+                                                           (list 'goto (create-label (fourth command) vs) 'goto (create-label (sixth command) vs))
                                                            )))
                                      (goto while-bb))
                 (case-return (if (equal? (car command) 'return) goto process-return goto process-error))
-                (process-return (code := append code (list (append (list return) (reduce (cdr command) vs))))
+                (process-return (code := append code (list (append (list 'return) (reduce (cdr command) vs))))
                                 (goto while-bb))
                 (process-error (return error "Mix: unknown expression"))
                 (exit (return residual))
@@ -263,7 +287,7 @@
                 (process-assign (if (is-static (car command) static) goto update-vs goto extend-code-assign))
                 (update-vs (vs := hash-set vs (car command) (interpret-expr (hash->list vs) (list-to-val (cdr (cdr command)))))
                            (goto while-bb))
-                (extend-code-assign (code := append code (list (append (list (car command) :=) (reduce (list-to-val (cdr (cdr command))) vs))))
+                (extend-code-assign (code := append code (list (append (list (car command) ':=) (reduce (cdr (cdr command)) vs))))
                                     (goto while-bb))
                 (case-goto (if (equal? (car command) 'goto) goto process-goto goto case-if))
                 (process-goto (pp := cadr command)
@@ -282,12 +306,12 @@
                                               (set-union pending (list->set (list (create-label (fourth command) vs) (create-label (sixth command) vs))))
                                               marked)
                                      (code := append code (list (append
-                                                           (append (list if) (list (reduce (second command) vs)))
+                                                           (append (list 'if) (list (reduce (second command) vs)))
                                                            (list goto (create-label (fourth command) vs) goto (create-label (sixth command) vs))
                                                            )))
                                      (goto while-bb))
                 (case-return (if (equal? (car command) 'return) goto process-return goto process-error))
-                (process-return (code := append code (list (append (list return) (reduce (cdr command) vs))))
+                (process-return (code := append code (list (append (list 'return) (reduce (cdr command) vs))))
                                 (goto while-bb))
                 (process-error (return error "Mix: unknown expression"))
                 (exit (return residual))
