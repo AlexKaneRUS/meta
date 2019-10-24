@@ -19,6 +19,8 @@
 (provide the-mix)
 (provide first-futamura-new)
 (provide second-futamura)
+(provide third-futamura)
+(provide tm-compiler-third)
 
 (provide filter-vars)
 (provide create-label)
@@ -337,11 +339,21 @@
 ;   compiled program itslef  — (mixed)
 ;   running compiled program — (interpret (mixed) '((1 1 0 1 1)))   
                                           
-; NOTE: the code below really works, but produced compiler has around 360 labels
-;       and its generation time is approximately 5 mins. It looks like there's
-;       an error somewhere concerning visiting pending blocks that SHOULD HAVE BEEN
-;       marked, but somehow they weren't marked.
 ; II Futamura projection really compiles programs the same way as I projection: 
 ;  (pretty-print (interpret (second-futamura) (list (list (cons 'Q (tm-example-1))))))
 ; II Futamura projection compiler produces programs that give accurate result: 
 ;  (interpret (interpret (second-futamura) (list (list (cons 'Q (tm-example-1))))) '((1 1 0 1 1)))
+
+; III projection TM
+
+(define (third-futamura) (pretty-print (interpret (the-mix) (list
+                                             (the-mix)
+                                             (cons '(program division static dynamic dynamic-labels dynamic-labels-tmp 
+                                               bb command pp-tmp) '(pending marked residual ppvs pp vs vs0 code))
+                                             (list (cons 'program (the-mix))
+                                                   (cons 'division (cons '(program division static dynamic dynamic-labels dynamic-labels-tmp 
+                                                     bb command pp-tmp) '(pending marked residual ppvs pp vs vs0 code))))))))
+
+(define (tm-compiler-third) (pretty-print (interpret (third-futamura) (list (list (cons 'program (tm-interpreter)) (cons 'division (cons '(Q Qtail Instruction Operator Symbol NextLabel) '(Right Left))))))))
+; compiled program — (interpret (tm-compiler-third) (list (list (cons 'Q (tm-example-1))))
+

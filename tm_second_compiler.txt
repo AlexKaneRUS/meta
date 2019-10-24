@@ -1,0 +1,643 @@
+(list
+ '(read vs0)
+ (list
+  "label0"
+  (list 'pending ':= 'quote (set))
+  '(residual := quote ((read Right)))
+  '(ppvs := create-label 'init (make-immutable-hash vs0))
+  '(pp := car ppvs)
+  '(vs := cdr ppvs)
+  '(marked := set-add (list->set ()) ppvs)
+  '(code := cons (create-label pp vs) '())
+  '(vs := hash-set vs 'Qtail (interpret-expr (hash->list vs) 'Q))
+  '(code := append code (list (append '(Left :=) (reduce '('()) vs))))
+  '(pp := quote loop)
+  '(if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label1"
+     goto
+     "label49"))
+ '("label1"
+   (pp := quote stop)
+   (code := append code (list (append '(return) (reduce '(Right) vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label2" goto "label3"))
+ '("label2" (return residual))
+ '("label3"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'jump) goto "label4" goto "label42"))
+ '("label4"
+   (vs
+    :=
+    hash-set
+    vs
+    'Qtail
+    (interpret-expr (hash->list vs) '(list-tail Q NextLabel)))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label5"
+     goto
+     "label7"))
+ '("label5"
+   (pp := quote stop)
+   (code := append code (list (append '(return) (reduce '(Right) vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label6" goto "label48"))
+ '("label6" (return residual))
+ '("label7"
+   (pp := quote cont)
+   (vs
+    :=
+    hash-set
+    vs
+    'Instruction
+    (interpret-expr (hash->list vs) '(car Qtail)))
+   (vs := hash-set vs 'Qtail (interpret-expr (hash->list vs) '(cdr Qtail)))
+   (vs
+    :=
+    hash-set
+    vs
+    'Operator
+    (interpret-expr (hash->list vs) '(car Instruction)))
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'right))
+     goto
+     "label9"
+     goto
+     "label8"))
+ '("label8"
+   (pp := quote cont1)
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'left))
+     goto
+     "label35"
+     goto
+     "label10"))
+ '("label9"
+   (pp := quote do-right)
+   (code
+    :=
+    append
+    code
+    (list (append '(Left :=) (reduce '(cons (car Right) Left) vs))))
+   (code := append code (list (append '(Right :=) (reduce '(cdr Right) vs))))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label5"
+     goto
+     "label7"))
+ '("label10"
+   (pp := quote cont2)
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'write))
+     goto
+     "label37"
+     goto
+     "label11"))
+ '("label11"
+   (pp := quote cont3)
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'goto))
+     goto
+     "label66"
+     goto
+     "label12"))
+ '("label12"
+   (pp := quote cont4)
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'if))
+     goto
+     "label13"
+     goto
+     "label14"))
+ '("label13"
+   (pp := quote do-if)
+   (vs
+    :=
+    hash-set
+    vs
+    'Symbol
+    (interpret-expr (hash->list vs) '(cadr Instruction)))
+   (vs
+    :=
+    hash-set
+    vs
+    'NextLabel
+    (interpret-expr (hash->list vs) '(cadddr Instruction)))
+   (pending
+    :=
+    set-subtract
+    (set-union
+     pending
+     (list->set (list (create-label 'jump vs) (create-label 'loop vs))))
+    marked)
+   (code
+    :=
+    append
+    code
+    (list
+     (append
+      (append '(if) (list (reduce '(equal? Symbol (car Right)) vs)))
+      (list goto (create-label 'jump vs) goto (create-label 'loop vs)))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label47" goto "label38"))
+ '("label14"
+   (pp := quote error)
+   (code
+    :=
+    append
+    code
+    (list (append '(return) (reduce '(('syntaxerror: Instruction)) vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label15" goto "label16"))
+ '("label15" (return residual))
+ '("label16"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'jump) goto "label17" goto "label18"))
+ '("label17"
+   (vs
+    :=
+    hash-set
+    vs
+    'Qtail
+    (interpret-expr (hash->list vs) '(list-tail Q NextLabel)))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label5"
+     goto
+     "label7"))
+ '("label18" (if (equal? pp 'loop) goto "label20" goto "label19"))
+ '("label19" (return 'error))
+ '("label20"
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label21"
+     goto
+     "label22"))
+ '("label21"
+   (pp := quote stop)
+   (code := append code (list (append '(return) (reduce '(Right) vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label64" goto "label33"))
+ '("label22"
+   (pp := quote cont)
+   (vs
+    :=
+    hash-set
+    vs
+    'Instruction
+    (interpret-expr (hash->list vs) '(car Qtail)))
+   (vs := hash-set vs 'Qtail (interpret-expr (hash->list vs) '(cdr Qtail)))
+   (vs
+    :=
+    hash-set
+    vs
+    'Operator
+    (interpret-expr (hash->list vs) '(car Instruction)))
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'right))
+     goto
+     "label36"
+     goto
+     "label23"))
+ '("label23"
+   (pp := quote cont1)
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'left))
+     goto
+     "label32"
+     goto
+     "label24"))
+ '("label24"
+   (pp := quote cont2)
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'write))
+     goto
+     "label25"
+     goto
+     "label26"))
+ '("label25"
+   (pp := quote do-write)
+   (vs
+    :=
+    hash-set
+    vs
+    'Symbol
+    (interpret-expr (hash->list vs) '(cadr Instruction)))
+   (code
+    :=
+    append
+    code
+    (list (append '(Right :=) (reduce '(cons Symbol (cdr Right)) vs))))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label21"
+     goto
+     "label22"))
+ '("label26"
+   (pp := quote cont3)
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'goto))
+     goto
+     "label34"
+     goto
+     "label27"))
+ '("label27"
+   (pp := quote cont4)
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'if))
+     goto
+     "label30"
+     goto
+     "label28"))
+ '("label28"
+   (pp := quote error)
+   (code
+    :=
+    append
+    code
+    (list (append '(return) (reduce '(('syntaxerror: Instruction)) vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label46" goto "label29"))
+ '("label29"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'jump) goto "label17" goto "label18"))
+ '("label30"
+   (pp := quote do-if)
+   (vs
+    :=
+    hash-set
+    vs
+    'Symbol
+    (interpret-expr (hash->list vs) '(cadr Instruction)))
+   (vs
+    :=
+    hash-set
+    vs
+    'NextLabel
+    (interpret-expr (hash->list vs) '(cadddr Instruction)))
+   (pending
+    :=
+    set-subtract
+    (set-union
+     pending
+     (list->set (list (create-label 'jump vs) (create-label 'loop vs))))
+    marked)
+   (code
+    :=
+    append
+    code
+    (list
+     (append
+      (append '(if) (list (reduce '(equal? Symbol (car Right)) vs)))
+      (list goto (create-label 'jump vs) goto (create-label 'loop vs)))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label31" goto "label45"))
+ '("label31" (return residual))
+ '("label32"
+   (pp := quote do-left)
+   (code
+    :=
+    append
+    code
+    (list (append '(Right :=) (reduce '(cons (car Left) Right) vs))))
+   (code := append code (list (append '(Left :=) (reduce '(cdr Left) vs))))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label21"
+     goto
+     "label22"))
+ '("label33"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'jump) goto "label4" goto "label42"))
+ '("label34"
+   (pp := quote do-goto)
+   (vs
+    :=
+    hash-set
+    vs
+    'NextLabel
+    (interpret-expr (hash->list vs) '(cadr Instruction)))
+   (vs
+    :=
+    hash-set
+    vs
+    'Qtail
+    (interpret-expr (hash->list vs) '(list-tail Q NextLabel)))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label21"
+     goto
+     "label22"))
+ '("label35"
+   (pp := quote do-left)
+   (code
+    :=
+    append
+    code
+    (list (append '(Right :=) (reduce '(cons (car Left) Right) vs))))
+   (code := append code (list (append '(Left :=) (reduce '(cdr Left) vs))))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label5"
+     goto
+     "label7"))
+ '("label36"
+   (pp := quote do-right)
+   (code
+    :=
+    append
+    code
+    (list (append '(Left :=) (reduce '(cons (car Right) Left) vs))))
+   (code := append code (list (append '(Right :=) (reduce '(cdr Right) vs))))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label21"
+     goto
+     "label22"))
+ '("label37"
+   (pp := quote do-write)
+   (vs
+    :=
+    hash-set
+    vs
+    'Symbol
+    (interpret-expr (hash->list vs) '(cadr Instruction)))
+   (code
+    :=
+    append
+    code
+    (list (append '(Right :=) (reduce '(cons Symbol (cdr Right)) vs))))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label5"
+     goto
+     "label7"))
+ '("label38"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'jump) goto "label41" goto "label39"))
+ '("label39" (if (equal? pp 'loop) goto "label65" goto "label40"))
+ '("label40" (return 'error))
+ '("label41"
+   (vs
+    :=
+    hash-set
+    vs
+    'Qtail
+    (interpret-expr (hash->list vs) '(list-tail Q NextLabel)))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label5"
+     goto
+     "label7"))
+ '("label42" (if (equal? pp 'loop) goto "label43" goto "label44"))
+ '("label43"
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label21"
+     goto
+     "label22"))
+ '("label44" (return 'error))
+ '("label45"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'jump) goto "label41" goto "label39"))
+ '("label46" (return residual))
+ '("label47" (return residual))
+ '("label48"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'jump) goto "label4" goto "label42"))
+ '("label49"
+   (pp := quote cont)
+   (vs
+    :=
+    hash-set
+    vs
+    'Instruction
+    (interpret-expr (hash->list vs) '(car Qtail)))
+   (vs := hash-set vs 'Qtail (interpret-expr (hash->list vs) '(cdr Qtail)))
+   (vs
+    :=
+    hash-set
+    vs
+    'Operator
+    (interpret-expr (hash->list vs) '(car Instruction)))
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'right))
+     goto
+     "label50"
+     goto
+     "label51"))
+ '("label50"
+   (pp := quote do-right)
+   (code
+    :=
+    append
+    code
+    (list (append '(Left :=) (reduce '(cons (car Right) Left) vs))))
+   (code := append code (list (append '(Right :=) (reduce '(cdr Right) vs))))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label1"
+     goto
+     "label49"))
+ '("label51"
+   (pp := quote cont1)
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'left))
+     goto
+     "label53"
+     goto
+     "label52"))
+ '("label52"
+   (pp := quote cont2)
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'write))
+     goto
+     "label54"
+     goto
+     "label55"))
+ '("label53"
+   (pp := quote do-left)
+   (code
+    :=
+    append
+    code
+    (list (append '(Right :=) (reduce '(cons (car Left) Right) vs))))
+   (code := append code (list (append '(Left :=) (reduce '(cdr Left) vs))))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label1"
+     goto
+     "label49"))
+ '("label54"
+   (pp := quote do-write)
+   (vs
+    :=
+    hash-set
+    vs
+    'Symbol
+    (interpret-expr (hash->list vs) '(cadr Instruction)))
+   (code
+    :=
+    append
+    code
+    (list (append '(Right :=) (reduce '(cons Symbol (cdr Right)) vs))))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label1"
+     goto
+     "label49"))
+ '("label55"
+   (pp := quote cont3)
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'goto))
+     goto
+     "label62"
+     goto
+     "label56"))
+ '("label56"
+   (pp := quote cont4)
+   (if (interpret-expr (hash->list vs) '(equal? Operator 'if))
+     goto
+     "label57"
+     goto
+     "label58"))
+ '("label57"
+   (pp := quote do-if)
+   (vs
+    :=
+    hash-set
+    vs
+    'Symbol
+    (interpret-expr (hash->list vs) '(cadr Instruction)))
+   (vs
+    :=
+    hash-set
+    vs
+    'NextLabel
+    (interpret-expr (hash->list vs) '(cadddr Instruction)))
+   (pending
+    :=
+    set-subtract
+    (set-union
+     pending
+     (list->set (list (create-label 'jump vs) (create-label 'loop vs))))
+    marked)
+   (code
+    :=
+    append
+    code
+    (list
+     (append
+      (append '(if) (list (reduce '(equal? Symbol (car Right)) vs)))
+      (list goto (create-label 'jump vs) goto (create-label 'loop vs)))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label63" goto "label61"))
+ '("label58"
+   (pp := quote error)
+   (code
+    :=
+    append
+    code
+    (list (append '(return) (reduce '(('syntaxerror: Instruction)) vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label60" goto "label59"))
+ '("label59"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'jump) goto "label17" goto "label18"))
+ '("label60" (return residual))
+ '("label61"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'jump) goto "label41" goto "label39"))
+ '("label62"
+   (pp := quote do-goto)
+   (vs
+    :=
+    hash-set
+    vs
+    'NextLabel
+    (interpret-expr (hash->list vs) '(cadr Instruction)))
+   (vs
+    :=
+    hash-set
+    vs
+    'Qtail
+    (interpret-expr (hash->list vs) '(list-tail Q NextLabel)))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label1"
+     goto
+     "label49"))
+ '("label63" (return residual))
+ '("label64" (return residual))
+ '("label65"
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label21"
+     goto
+     "label22"))
+ '("label66"
+   (pp := quote do-goto)
+   (vs
+    :=
+    hash-set
+    vs
+    'NextLabel
+    (interpret-expr (hash->list vs) '(cadr Instruction)))
+   (vs
+    :=
+    hash-set
+    vs
+    'Qtail
+    (interpret-expr (hash->list vs) '(list-tail Q NextLabel)))
+   (pp := quote loop)
+   (if (interpret-expr (hash->list vs) '(null? Qtail))
+     goto
+     "label5"
+     goto
+     "label7")))
