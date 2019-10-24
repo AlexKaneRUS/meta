@@ -22,6 +22,14 @@
 (provide third-futamura)
 (provide tm-compiler-third)
 
+(provide zip)
+
+(provide find-name)
+(provide flow-chart-interpreter)
+(provide first-futamura-fc)
+(provide second-futamura-fc)
+(provide fc-compiler-third)
+
 (provide filter-vars)
 (provide create-label)
 (provide is-static)
@@ -355,5 +363,53 @@
                                                      bb command pp-tmp) '(pending marked residual ppvs pp vs vs0 code))))))))
 
 (define (tm-compiler-third) (pretty-print (interpret (third-futamura) (list (list (cons 'program (tm-interpreter)) (cons 'division (cons '(Q Qtail Instruction Operator Symbol NextLabel) '(Right Left))))))))
-; compiled program — (interpret (tm-compiler-third) (list (list (cons 'Q (tm-example-1))))
 
+; FlowChart tasks
+
+(define (flow-chart-interpreter) '((read program vs)
+                                   (pre-main (vs := make-immutable-hash (zip (cdr (car program)) vs))
+                                             (bb := cdr (cadr program))
+                                             (program := make-immutable-hash (cdr program))
+                                             (goto while-bb))
+                                   (while-bb (if (null? bb) goto error-exit goto body-bb))
+                                   (body-bb (command := car bb)
+                                            (bb := cdr bb)
+                                            (goto case-assign))
+                                   (case-assign (if (equal? (second command) ':=) goto process-assign goto case-goto))
+                                   (process-assign (vs := hash-set vs (car command) (interpret-expr (hash->list vs) (list-to-val (cdr (cdr command)))))
+                                                   (goto while-bb))
+                                   (case-goto (if (equal? (car command) 'goto) goto process-goto goto case-if))
+                                   (process-goto (bb := hash-ref program (cadr command))
+                                                 (goto while-bb))
+                                   (case-if (if (equal? (car command) 'if) goto process-if goto case-return))
+                                   (process-if (if (interpret-expr (hash->list vs) (second command)) goto static-pp-quote goto static-pp-quote-quote))
+                                   (static-pp-quote (bb := hash-ref program (fourth command))
+                                                    (goto while-bb))
+                                   (static-pp-quote-quote (bb := hash-ref program (sixth command))
+                                                          (goto while-bb))
+                                   (case-return (if (equal? (car command) 'return) goto process-return goto error-exit))
+                                   (process-return (return (interpret-expr (hash->list vs) (list-to-val (cdr command)))))
+                                   (error-exit (return 'error))
+                                  ))
+                                  
+; (interpret (flow-chart-interpreter) (list (find-name) '("alex" ("al" "al" "alx" "alex" "al") (0 3 2 1 4))))
+
+(define (first-futamura-fc) (pretty-print (interpret (the-mix) (list
+                                           (flow-chart-interpreter)
+                                           (cons '(program bb command) '(vs))
+                                           (list (cons 'program (find-name)))))))
+
+; program compiled using I projection — (first-futamura-fc)
+; it runs and gives correct result    — (interpret (first-futamura-fc) (list (list "alex" '("al" "al" "alx" "alex" "al") '(0 3 2 1 4))))
+
+(define (second-futamura-fc) (pretty-print (interpret (the-mix) (list
+                                           (the-mix)
+                                           (cons '(program division static dynamic dynamic-labels dynamic-labels-tmp 
+                                             bb command pp-tmp) '(pending marked residual ppvs pp vs vs0 code))
+                                           (list (cons 'program (flow-chart-interpreter))
+                                                 (cons 'division (cons '(program bb command) '(vs))))))))
+                                                 
+; program compiled using II projection as a compiler — (pretty-print (interpret (second-futamura-fc) (list (list (cons 'program (find-name))))))
+; it runs and gives correct result                   — (interpret (pretty-print (interpret (second-futamura-fc) (list (list (cons 'program (find-name)))))) (list (list "alex" '("al" "al" "alx" "alex" "al") '(0 3 2 1 4))))
+
+(define (fc-compiler-third) (pretty-print (interpret (third-futamura) (list (list (cons 'program (flow-chart-interpreter)) (cons 'division (cons '(program bb command) '(vs))))))))

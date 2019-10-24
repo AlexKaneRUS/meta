@@ -1,0 +1,559 @@
+(list
+ '(read vs0)
+ (list
+  "label0"
+  (list 'pending ':= 'quote (set))
+  '(residual := quote ((read vs)))
+  '(ppvs := create-label 'pre-main (make-immutable-hash vs0))
+  '(pp := car ppvs)
+  '(vs := cdr ppvs)
+  '(marked := set-add (list->set ()) ppvs)
+  '(code := cons (create-label pp vs) '())
+  '(code
+    :=
+    append
+    code
+    (list
+     (append
+      '(vs :=)
+      (reduce '(make-immutable-hash (zip (cdr (car program)) vs)) vs))))
+  '(vs
+    :=
+    hash-set
+    vs
+    'bb
+    (interpret-expr (hash->list vs) '(cdr (cadr program))))
+  '(vs
+    :=
+    hash-set
+    vs
+    'program
+    (interpret-expr (hash->list vs) '(make-immutable-hash (cdr program))))
+  '(pp := quote while-bb)
+  '(if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label1"
+     goto
+     "label2"))
+ '("label1"
+   (pp := quote error-exit)
+   (code := append code (list (append '(return) (reduce '('error) vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label54" goto "label5"))
+ '("label2"
+   (pp := quote body-bb)
+   (vs := hash-set vs 'command (interpret-expr (hash->list vs) '(car bb)))
+   (vs := hash-set vs 'bb (interpret-expr (hash->list vs) '(cdr bb)))
+   (pp := quote case-assign)
+   (if (interpret-expr (hash->list vs) '(equal? (second command) ':=))
+     goto
+     "label40"
+     goto
+     "label3"))
+ '("label3"
+   (pp := quote case-goto)
+   (if (interpret-expr (hash->list vs) '(equal? (car command) 'goto))
+     goto
+     "label4"
+     goto
+     "label41"))
+ '("label4"
+   (pp := quote process-goto)
+   (vs
+    :=
+    hash-set
+    vs
+    'bb
+    (interpret-expr (hash->list vs) '(hash-ref program (cadr command))))
+   (pp := quote while-bb)
+   (if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label1"
+     goto
+     "label2"))
+ '("label5"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'static-pp-quote) goto "label59" goto "label6"))
+ '("label6"
+   (if (equal? pp 'static-pp-quote-quote) goto "label7" goto "label10"))
+ '("label7"
+   (vs
+    :=
+    hash-set
+    vs
+    'bb
+    (interpret-expr (hash->list vs) '(hash-ref program (sixth command))))
+   (pp := quote while-bb)
+   (if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label8"
+     goto
+     "label11"))
+ '("label8"
+   (pp := quote error-exit)
+   (code := append code (list (append '(return) (reduce '('error) vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label9" goto "label58"))
+ '("label9" (return residual))
+ '("label10" (return 'error))
+ '("label11"
+   (pp := quote body-bb)
+   (vs := hash-set vs 'command (interpret-expr (hash->list vs) '(car bb)))
+   (vs := hash-set vs 'bb (interpret-expr (hash->list vs) '(cdr bb)))
+   (pp := quote case-assign)
+   (if (interpret-expr (hash->list vs) '(equal? (second command) ':=))
+     goto
+     "label37"
+     goto
+     "label12"))
+ '("label12"
+   (pp := quote case-goto)
+   (if (interpret-expr (hash->list vs) '(equal? (car command) 'goto))
+     goto
+     "label60"
+     goto
+     "label13"))
+ '("label13"
+   (pp := quote case-if)
+   (if (interpret-expr (hash->list vs) '(equal? (car command) 'if))
+     goto
+     "label23"
+     goto
+     "label14"))
+ '("label14"
+   (pp := quote case-return)
+   (if (interpret-expr (hash->list vs) '(equal? (car command) 'return))
+     goto
+     "label15"
+     goto
+     "label30"))
+ '("label15"
+   (pp := quote process-return)
+   (code
+    :=
+    append
+    code
+    (list
+     (append
+      '(return)
+      (reduce
+       '((interpret-expr (hash->list vs) (list-to-val (cdr command))))
+       vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label19" goto "label16"))
+ '("label16"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'static-pp-quote) goto "label20" goto "label17"))
+ '("label17"
+   (if (equal? pp 'static-pp-quote-quote) goto "label18" goto "label56"))
+ '("label18"
+   (vs
+    :=
+    hash-set
+    vs
+    'bb
+    (interpret-expr (hash->list vs) '(hash-ref program (sixth command))))
+   (pp := quote while-bb)
+   (if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label8"
+     goto
+     "label11"))
+ '("label19" (return residual))
+ '("label20"
+   (vs
+    :=
+    hash-set
+    vs
+    'bb
+    (interpret-expr (hash->list vs) '(hash-ref program (fourth command))))
+   (pp := quote while-bb)
+   (if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label38"
+     goto
+     "label21"))
+ '("label21"
+   (pp := quote body-bb)
+   (vs := hash-set vs 'command (interpret-expr (hash->list vs) '(car bb)))
+   (vs := hash-set vs 'bb (interpret-expr (hash->list vs) '(cdr bb)))
+   (pp := quote case-assign)
+   (if (interpret-expr (hash->list vs) '(equal? (second command) ':=))
+     goto
+     "label22"
+     goto
+     "label31"))
+ '("label22"
+   (pp := quote process-assign)
+   (code
+    :=
+    append
+    code
+    (list
+     (append
+      '(vs :=)
+      (reduce
+       '(hash-set
+         vs
+         (car command)
+         (interpret-expr (hash->list vs) (list-to-val (cdr (cdr command)))))
+       vs))))
+   (pp := quote while-bb)
+   (if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label38"
+     goto
+     "label21"))
+ '("label23"
+   (pp := quote process-if)
+   (pending
+    :=
+    set-subtract
+    (set-union
+     pending
+     (list->set
+      (list
+       (create-label 'static-pp-quote vs)
+       (create-label 'static-pp-quote-quote vs))))
+    marked)
+   (code
+    :=
+    append
+    code
+    (list
+     (append
+      (append
+       '(if)
+       (list (reduce '(interpret-expr (hash->list vs) (second command)) vs)))
+      (list
+       goto
+       (create-label 'static-pp-quote vs)
+       goto
+       (create-label 'static-pp-quote-quote vs)))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label24" goto "label25"))
+ '("label24" (return residual))
+ '("label25"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'static-pp-quote) goto "label26" goto "label27"))
+ '("label26"
+   (vs
+    :=
+    hash-set
+    vs
+    'bb
+    (interpret-expr (hash->list vs) '(hash-ref program (fourth command))))
+   (pp := quote while-bb)
+   (if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label38"
+     goto
+     "label21"))
+ '("label27"
+   (if (equal? pp 'static-pp-quote-quote) goto "label29" goto "label28"))
+ '("label28" (return 'error))
+ '("label29"
+   (vs
+    :=
+    hash-set
+    vs
+    'bb
+    (interpret-expr (hash->list vs) '(hash-ref program (sixth command))))
+   (pp := quote while-bb)
+   (if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label8"
+     goto
+     "label11"))
+ '("label30"
+   (pp := quote error-exit)
+   (code := append code (list (append '(return) (reduce '('error) vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label9" goto "label58"))
+ '("label31"
+   (pp := quote case-goto)
+   (if (interpret-expr (hash->list vs) '(equal? (car command) 'goto))
+     goto
+     "label34"
+     goto
+     "label32"))
+ '("label32"
+   (pp := quote case-if)
+   (if (interpret-expr (hash->list vs) '(equal? (car command) 'if))
+     goto
+     "label50"
+     goto
+     "label33"))
+ '("label33"
+   (pp := quote case-return)
+   (if (interpret-expr (hash->list vs) '(equal? (car command) 'return))
+     goto
+     "label36"
+     goto
+     "label35"))
+ '("label34"
+   (pp := quote process-goto)
+   (vs
+    :=
+    hash-set
+    vs
+    'bb
+    (interpret-expr (hash->list vs) '(hash-ref program (cadr command))))
+   (pp := quote while-bb)
+   (if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label38"
+     goto
+     "label21"))
+ '("label35"
+   (pp := quote error-exit)
+   (code := append code (list (append '(return) (reduce '('error) vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label55" goto "label49"))
+ '("label36"
+   (pp := quote process-return)
+   (code
+    :=
+    append
+    code
+    (list
+     (append
+      '(return)
+      (reduce
+       '((interpret-expr (hash->list vs) (list-to-val (cdr command))))
+       vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label53" goto "label39"))
+ '("label37"
+   (pp := quote process-assign)
+   (code
+    :=
+    append
+    code
+    (list
+     (append
+      '(vs :=)
+      (reduce
+       '(hash-set
+         vs
+         (car command)
+         (interpret-expr (hash->list vs) (list-to-val (cdr (cdr command)))))
+       vs))))
+   (pp := quote while-bb)
+   (if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label8"
+     goto
+     "label11"))
+ '("label38"
+   (pp := quote error-exit)
+   (code := append code (list (append '(return) (reduce '('error) vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label55" goto "label49"))
+ '("label39"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'static-pp-quote) goto "label20" goto "label17"))
+ '("label40"
+   (pp := quote process-assign)
+   (code
+    :=
+    append
+    code
+    (list
+     (append
+      '(vs :=)
+      (reduce
+       '(hash-set
+         vs
+         (car command)
+         (interpret-expr (hash->list vs) (list-to-val (cdr (cdr command)))))
+       vs))))
+   (pp := quote while-bb)
+   (if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label1"
+     goto
+     "label2"))
+ '("label41"
+   (pp := quote case-if)
+   (if (interpret-expr (hash->list vs) '(equal? (car command) 'if))
+     goto
+     "label42"
+     goto
+     "label45"))
+ '("label42"
+   (pp := quote process-if)
+   (pending
+    :=
+    set-subtract
+    (set-union
+     pending
+     (list->set
+      (list
+       (create-label 'static-pp-quote vs)
+       (create-label 'static-pp-quote-quote vs))))
+    marked)
+   (code
+    :=
+    append
+    code
+    (list
+     (append
+      (append
+       '(if)
+       (list (reduce '(interpret-expr (hash->list vs) (second command)) vs)))
+      (list
+       goto
+       (create-label 'static-pp-quote vs)
+       goto
+       (create-label 'static-pp-quote-quote vs)))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label44" goto "label43"))
+ '("label43"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'static-pp-quote) goto "label26" goto "label27"))
+ '("label44" (return residual))
+ '("label45"
+   (pp := quote case-return)
+   (if (interpret-expr (hash->list vs) '(equal? (car command) 'return))
+     goto
+     "label47"
+     goto
+     "label46"))
+ '("label46"
+   (pp := quote error-exit)
+   (code := append code (list (append '(return) (reduce '('error) vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label54" goto "label5"))
+ '("label47"
+   (pp := quote process-return)
+   (code
+    :=
+    append
+    code
+    (list
+     (append
+      '(return)
+      (reduce
+       '((interpret-expr (hash->list vs) (list-to-val (cdr command))))
+       vs))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label48" goto "label57"))
+ '("label48" (return residual))
+ '("label49"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'static-pp-quote) goto "label59" goto "label6"))
+ '("label50"
+   (pp := quote process-if)
+   (pending
+    :=
+    set-subtract
+    (set-union
+     pending
+     (list->set
+      (list
+       (create-label 'static-pp-quote vs)
+       (create-label 'static-pp-quote-quote vs))))
+    marked)
+   (code
+    :=
+    append
+    code
+    (list
+     (append
+      (append
+       '(if)
+       (list (reduce '(interpret-expr (hash->list vs) (second command)) vs)))
+      (list
+       goto
+       (create-label 'static-pp-quote vs)
+       goto
+       (create-label 'static-pp-quote-quote vs)))))
+   (residual := append residual (list code))
+   (if (set-empty? pending) goto "label52" goto "label51"))
+ '("label51"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'static-pp-quote) goto "label26" goto "label27"))
+ '("label52" (return residual))
+ '("label53" (return residual))
+ '("label54" (return residual))
+ '("label55" (return residual))
+ '("label56" (return 'error))
+ '("label57"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'static-pp-quote) goto "label20" goto "label17"))
+ '("label58"
+   (ppvs := set-first pending)
+   (pending := set-rest pending)
+   (pp := car ppvs)
+   (vs := cdr ppvs)
+   (marked := set-add marked ppvs)
+   (code := cons (create-label pp vs) ())
+   (if (equal? pp 'static-pp-quote) goto "label59" goto "label6"))
+ '("label59"
+   (vs
+    :=
+    hash-set
+    vs
+    'bb
+    (interpret-expr (hash->list vs) '(hash-ref program (fourth command))))
+   (pp := quote while-bb)
+   (if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label38"
+     goto
+     "label21"))
+ '("label60"
+   (pp := quote process-goto)
+   (vs
+    :=
+    hash-set
+    vs
+    'bb
+    (interpret-expr (hash->list vs) '(hash-ref program (cadr command))))
+   (pp := quote while-bb)
+   (if (interpret-expr (hash->list vs) '(null? bb))
+     goto
+     "label8"
+     goto
+     "label11")))
