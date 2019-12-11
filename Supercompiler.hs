@@ -79,6 +79,46 @@ sub (Lam x e) k v = if x == k then Lam x e else Lam x (sub e k v)
 sub (Binop x l r) k v = Binop x (sub l k v) (sub r k v)
 sub (C x xs) k v      = C x $ fmap (\x' -> sub x' k v) xs
 
+-- evalStep :: E -> DefsM -> Maybe E
+-- evalStep e defs = evaluateE' e
+--   where
+--     evaluateE' :: E -> Maybe E
+--     evaluateE' (Func x)          = Just $ defs M.! x
+--     evaluateE' (App (Lam x b) r) = Just $ sub b x r
+--     evaluateE' (App l r)         =
+--         case evalStep l defs of
+--             Nothing -> fmap (App l) $ evalStep e defs
+--             Just l' -> Just $ App l' r
+--     evaluateE' (Let x e b) =
+--       case evalStep e  defs of
+--         Nothing -> Just $ sub b x e
+--         Just e' -> Just $ Let x e' b
+--     evaluateE' (Case e ps) =
+--       case evalStep e defs of
+--         Nothing -> do
+--           let candidates = catMaybes $ fmap sequence . fmap T.swap $ (\((p, b), e'') -> (matchPat mempty (p, e''), b)) <$> zip ps (repeat e)
+--           case candidates of
+--               []            -> fail "Can't pattern match."
+--               (e'', m') : _ -> evalStep (foldl (\b (k, v) -> sub b k v) e'' (M.toList m')) defs
+--         Just e' -> Just $ Case e' ps
+--     evaluateE' i@I{}          = pure i
+--     evaluateE' b@B{}          = pure b
+--     evaluateE' v@Var{}        = pure v
+--     evaluateE' l@Lam{}        = pure l
+--     evaluateE' (C c s)        = C c <$> mapM evaluateE s
+--     evaluateE' (Binop op l r) = do
+--         I l <- evaluateE l
+--         I r <- evaluateE r
+
+--         case op of
+--             "+"  -> pure $ I $ l + r
+--             "-"  -> pure $ I $ l - r
+--             "*"  -> pure $ I $ l * r
+--             "<"  -> pure $ B $ l < r
+--             "<=" -> pure $ B $ l <= r
+--             ">"  -> pure $ B $ l > r
+--             ">=" -> pure $ B $ l >= r
+
 evaluateE :: E -> Reader DefsM E
 evaluateE e = evaluateE' e
   where
@@ -247,12 +287,30 @@ mtg (C c s) (C c' s') = do
     (es, ss, ss') <- unzip3 <$> zipWithM mtg s s'
 
     pure (C c es, unionSubsMany ss, unionSubsMany ss')
-mtg x y = do
-    n <- freshName
-    pure (Var n, [(n, Right x)], [(n, Right y)])
+mtg x (Var n) =
+    pure (Var n, [(n, Right x)], [])
+mtg x y =
+    if x == y
+      then pure (x, [], [])
+      else do
+        n <- freshName
+        pure (Var n, [(n, Right x)], [(n, Right y)])
 
 mtgRun :: State NameGen Gen -> Gen
 mtgRun = flip ST.evalState nameGen
+
+data Label = AppL
+           | ArgNumL Int
+           | IntL Int
+           | BoolL Bool
+           | ConsL
+           | CaseL
+           | LetL
+
+data Tree = Node E [(Label, Tree)] | Leaf
+
+buildTree :: E -> State Tree (Maybe E)
+buildTree = undefined
 
 ---------------------------------------------------------------
 -- Tests.
@@ -286,7 +344,7 @@ testPrg = Prg defs prg
     sumD = ("sum", Lam "xs" $ Lam "a" $
                     Case (Var "xs")
                         [ (CPat "Nil" [], Var "a")
-                        , (CPat "Cons" [VarPat "x", VarPat "xs"], Binop "+" (Var "x") (App (App (Func "sum") (Var "xs")) (Var "a")))
+                        , (CPat "Cons" [VarPat "x", VarPat "xs"], (App (App (Func "sum") (Var "xs")) (Binop "+" (Var "a") (Var "xs"))))
                         ])
 
     squareD = ("square", Lam "xs" $
@@ -361,3 +419,7 @@ mtgTest = test1 && test2 && test3 && test4
     (mtg4@(Lam _ (Lam _ Var{})), s11, s22) = mtgRun $ mtg lam1 lam3
 
     test4 = applySub s11 mtg4 == lam1 && applySub s22 mtg4 == lam3
+
+-- 1. Новую вершину в дерево добавляем перед анфолдингом функции.
+-- 2. Чтобы восстанавливать выражение, лучше завести тип Контекст, в который можно будет встроить текущее выражение.
+--    Контекст, наверное, должен повторять по структуре сами выражния. Отдельно надо обособить Дырку в этом Контксте.
