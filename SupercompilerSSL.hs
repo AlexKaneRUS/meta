@@ -121,10 +121,20 @@ usedNames = nub . usedNames'
   where
     usedNames' :: E -> [Name]
     usedNames' (Var x)        = [x]
-    usedNames' (C _ args)     = concatMap usedNames args
-    usedNames' (FCall _ args) = concatMap usedNames args
-    usedNames' (GCall _ args) = concatMap usedNames args
-    usedNames' (Let _ e e')   = usedNames e <> usedNames e'
+    usedNames' (C _ args)     = concatMap usedNames' args
+    usedNames' (FCall _ args) = concatMap usedNames' args
+    usedNames' (GCall _ args) = concatMap usedNames' args
+    usedNames' (Let _ e e')   = usedNames' e <> usedNames' e'
+
+freeVars :: E -> [Name]
+freeVars = nub . freeVars'
+    where
+      freeVars' :: E -> [Name]
+      freeVars' (Var x)        = [x]
+      freeVars' (C _ args)     = concatMap freeVars' args
+      freeVars' (FCall _ args) = concatMap freeVars' args
+      freeVars' (GCall _ args) = concatMap freeVars' args
+      freeVars' (Let n e e')   = freeVars' e <> (delete n $ freeVars' e')
 
 isVar :: E -> Bool
 isVar Var{} = True
@@ -232,8 +242,8 @@ oddZ = GDef "odd" (Pat "Z" []) [] $ C "False" []
 oddS :: Def
 oddS = GDef "odd" (Pat "S" ["x"]) [] $ GCall "even" [Var "x"]
 
-defs :: [Def]
-defs = [addZ, addS, multZ, multS, sqr, evenZ, evenS, oddZ, oddS]
+defsSZ :: [Def]
+defsSZ = [addZ, addS, multZ, multS, sqr, evenZ, evenS, oddZ, oddS]
 
 z = C "Z" []
 s = C "S" . pure
@@ -244,11 +254,11 @@ true  = C "True" []
 false = C "False" []
 
 interpretTest :: Bool
-interpretTest = sqrTest && isOddTest
+interpretTest = sqrTest && isOddTest && cmpTest
   where
-
-    sqrTest   = interpret (Prg defs (FCall "sqr" [three])) == nine
-    isOddTest = interpret (Prg defs (GCall "odd" [FCall "sqr" [three]])) == true
+    sqrTest   = interpret (Prg defsSZ (FCall "sqr" [three])) == nine
+    isOddTest = interpret (Prg defsSZ (GCall "odd" [FCall "sqr" [three]])) == true
+    cmpTest   = interpret (cmpTestPrg (toStr "AAB") (toStr "BBBBBBBBBBBBAAAAAAAAAAABBBBB")) == true
 
 --------------------------------------------------------------
 -- Driving.
@@ -300,11 +310,11 @@ driveTest :: Bool
 driveTest = transTest && variantsTest
   where
     transTest =
-      drive (Prg defs (GCall "odd" [FCall "sqr" [Var "x"]])) freshVars ==
+      drive (Prg defsSZ (GCall "odd" [FCall "sqr" [Var "x"]])) freshVars ==
         Trans (GCall "odd" [GCall "mult" [Var "x",Var "x"]])
 
     variantsTest =
-      drive (Prg defs (GCall "odd" [GCall "mult" [Var "x",Var "x"]])) freshVars ==
+      drive (Prg defsSZ (GCall "odd" [GCall "mult" [Var "x",Var "x"]])) freshVars ==
         Variants [(("x",Pat "Z" []),GCall "odd" [C "Z" []]),(("x",Pat "S" ["v0"]),GCall "odd" [GCall "add" [Var "x",GCall "mult" [Var "v0",Var "x"]]])]
 
 --------------------------------------------------------------
@@ -330,7 +340,100 @@ foldTree = foldFurther (performFolding [])
         pathToRoot = prev : toRoot
 
     getRenaming :: [Graph E] -> E -> Maybe (Renaming, Graph E)
-    getRenaming nodes e = listToMaybe $ catMaybes $ fmap (\x@(Node e' _) -> swap <$> sequence (x, findRenaming e e')) nodes
+    getRenaming nodes e = listToMaybe $ catMaybes $ fmap (\x@(Node e' _) -> swap <$> sequence (x, findRenaming e' e)) nodes
 
 testTree :: Graph E
-testTree = buildProcessTree $ Prg defs $ GCall "odd" [FCall "sqr" [Var "x"]]
+testTree = buildProcessTree $ Prg defsSZ $ GCall "odd" [FCall "sqr" [Var "x"]]
+
+--------------------------------------------------------------
+-- Code generator.
+--------------------------------------------------------------
+
+generate :: Graph E -> Prg
+generate = fst . helper freshVars []
+  where
+    helper :: [Name] -> [(E, E)] -> Graph E -> (Prg, [Name])
+    helper ns _ (Node e Stop)                  = (Prg [] e, ns)
+    helper ns bcs (Node (C n _) (Decompose l)) = (Prg defs $ C n es, ns')
+      where
+        (defs, es, ns') = evalArgs ns bcs l
+    helper ns bcs (Node (Let n _ _) (Decompose l)) = (Prg defs $ sub [(n, e)] b, ns')
+      where
+        (defs, [e, b], ns') = evalArgs ns bcs l
+    helper ((_ : num) : ns) bcs (Node e (Trans n)) = (Prg (fDef : defs) fCall, ns')
+      where
+        free  = freeVars e
+        fName = 'f' : num
+
+        fCall = FCall fName $ fmap Var free
+
+        (defs, [e'], ns') = evalArgs ns ((e, fCall) : bcs) [n]
+        fDef              = FDef fName free e'
+    helper ((_ : num) : ns) bcs (Node e (Variants l)) = (Prg (gDefs <> defs) gCall, ns')
+      where
+        free@(v : vs) = freeVars e
+        gName         = 'g' : num
+
+        gCall = GCall gName $ fmap Var (v : free)
+
+        (defs, es, ns') = evalArgs ns ((e, gCall) : bcs) $ fmap snd l
+        gDefs           = zipWith (\p e' -> GDef gName p free e') (fmap (snd . fst) l) es
+    helper ns bcs (Node e (Fold r (Node e' _))) = (Prg [] thisCall, ns)
+      where
+        Just recCall = e' `lookup` bcs
+        thisCall     = sub (fmap (fmap Var) r) recCall
+    helper _ _ _ = error "Can't generate code for node."
+
+
+    evalArgs :: [Name] -> [(E, E)] -> [Graph E] -> ([Def], [E], [Name])
+    evalArgs ns bcs = foldl' accum ([], [], ns)
+      where
+        accum :: ([Def], [E], [Name]) -> Graph E -> ([Def], [E], [Name])
+        accum (defs, es, ns') node = (defs <> defs', es <> [e], ns'')
+          where
+            (Prg defs' e, ns'') = helper ns' bcs node
+
+strNil :: E
+strNil = C "strNil" []
+
+toStr :: String -> E
+toStr = foldl' (\b a -> C "strCons" [C (pure a) [], b]) strNil . reverse
+
+cmpTestPrg :: E -> E -> Prg
+cmpTestPrg p s = Prg defs (FCall "match" [p, s])
+  where
+    defs = [ matchDef, mNilDef, mConsDef, xNilDef, xConsDef, nNilDef, nConsDef
+           , eqToADef, eqToBDef, eqAADef, eqANotADef, eqBBDef, eqBNotBDef, ifTrueDef
+           , ifFalseDef
+           ]
+
+    matchDef = FDef "match" ["p", "s"] $ GCall "m" [Var "p", Var "s", Var "p", Var "s"]
+
+    mNilDef  = GDef "m" (Pat "strNil" []) ["ss", "op", "os"] $ true
+    mConsDef = GDef "m" (Pat "strCons" ["p", "pp"]) ["ss", "op", "os"] $ GCall "x" [Var "ss", Var "p", Var "pp", Var "op", Var "os"]
+
+    xNilDef  = GDef "x" (Pat "strNil" []) ["p", "pp", "op", "os"] $ false
+    xConsDef = GDef "x" (Pat "strCons" ["s", "ss"]) ["p", "pp", "op", "os"] $ GCall "if" [GCall "eq" [Var "p", Var "s"], GCall "m" [Var "pp", Var "ss", Var "op", Var "os"], GCall "n" [Var "os", Var "op"]]
+
+    nNilDef  = GDef "n" (Pat "strNil" []) ["op"] $ false
+    nConsDef = GDef "n" (Pat "strCons" ["s", "ss"]) ["op"] $ GCall "m" [Var "op", Var "ss", Var "op", Var "ss"]
+
+    eqToADef = GDef "eq" (Pat "A" []) ["y"] $ GCall "eqA" [Var "y"]
+    eqToBDef = GDef "eq" (Pat "B" []) ["y"] $ GCall "eqB" [Var "y"]
+
+    eqAADef    = GDef "eqA" (Pat "A" []) [] $ true
+    eqANotADef = GDef "eqA" (Pat "B" []) [] $ false
+
+    eqBBDef    = GDef "eqB" (Pat "B" []) [] $ true
+    eqBNotBDef = GDef "eqB" (Pat "A" []) [] $ false
+
+    ifTrueDef  = GDef "if" (Pat "True" []) ["x", "y"] $ Var "x"
+    ifFalseDef = GDef "if" (Pat "False" []) ["x", "y"] $ Var "y"
+
+generateTest :: Bool
+generateTest = testCmpMatch && testCmpNotMatch
+  where
+    prg@(Prg defs e) = generate (foldTree $ buildProcessTree $ cmpTestPrg (toStr "AAB") (Var "s"))
+
+    testCmpMatch    = interpret (Prg defs $ sub [("s", toStr "BBBBBBBAAAAAAABBBBB")] e) == true
+    testCmpNotMatch = interpret (Prg defs $ sub [("s", toStr "BBBBBBBBBBBBAAAAA")] e) == false
