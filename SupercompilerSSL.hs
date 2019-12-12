@@ -1,10 +1,14 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE InstanceSigs        #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeFamilies        #-}
 
 module SupercompilerSSL where
 
 import           Control.Monad
+import           Data.Char      (toUpper)
 import           Data.Function  (on)
 import           Data.List
 import           Data.Maybe
@@ -24,17 +28,47 @@ data E = Var Name
        | FCall Name [E]
        | GCall Name [E]
        | Let Name E E
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance Show E where
+  show (Var x)           = x
+  show (C (x : xs) args) = (toUpper x : xs) <> if null argsS then "" else " " <> argsS
+    where
+      argsS = intercalate " " $ showArgs args
+  show (FCall n args) = n <> "(" <> intercalate ", " (showArgs args) <> ")"
+  show (GCall n args) = n <> "(" <> intercalate ", " (showArgs args) <> ")"
+  show (Let n e b)    = "let " <> n <> " = " <> show e <> " in " <> show b
 
 data Pat = Pat Name [Name]
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance Show Pat where
+  show (Pat (x : xs) argsP) = (toUpper x : xs) <> if null argsS then "" else " " <> argsS
+    where
+      argsS = intercalate " " argsP
+
+showArgs :: [E] -> [String]
+showArgs []                   = []
+showArgs (Var x : xs)         = x : showArgs xs
+showArgs (C (y : ys) [] : xs) = (toUpper y : ys) : showArgs xs
+showArgs (x : xs)             = "(" <> show x <> ")" : showArgs xs
 
 data Def = FDef Name [Name] E
          | GDef Name Pat [Name] E
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance Show Def where
+  show (FDef n args e)   = n <> "(" <> intercalate ", " args <> ") = " <> show e
+  show (GDef n p args e) = n <> "(" <> intercalate ", " (show p : args) <> ") = " <> show e
 
 data Prg = Prg [Def] E
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance Show Prg where
+  show (Prg defs e) = eS <> "\n  where\n" <> intercalate "\n" (fmap ("    " <>) defsS)
+    where
+      defsS = fmap show defs
+      eS    = show e
 
 --------------------------------------------------------------
 -- Aux.
@@ -104,6 +138,7 @@ findGDefForPat defs name patName = maybe err id $ find patMatcher $ findGDefs de
     patMatcher (GDef _ (Pat patName' _) _ _) = patName' == patName
     patMatcher _                             = err
 
+    err :: forall a. a
     err = error $ "Can't find def for g-function " <> name <> " with pat name " <> patName
 
 sub :: Subst -> E -> E
@@ -288,7 +323,10 @@ drive (Prg defs e) = helper e
     getVariant ns n args (GDef _ (Pat nP argsP) args' b) = res
       where
         fresh = take (length argsP) ns
-        res   = ((n, Pat nP fresh), sub (zip (argsP <> args') (fmap Var fresh <> args)) b)
+        res   = propagate $ ((n, Pat nP fresh), sub (zip (argsP <> args') (fmap Var fresh <> args)) b)
+
+        propagate :: ((Name, Pat), E) -> ((Name, Pat), E)
+        propagate (p@(x, Pat nP argsP), e) = (p, sub [(x, C nP $ fmap Var argsP)] e)
     getVariant _ _ _ _                                   = error "getVariant for non-g-function def."
 
 buildProcessTree :: Prg -> Graph E
@@ -315,7 +353,7 @@ driveTest = transTest && variantsTest
 
     variantsTest =
       drive (Prg defsSZ (GCall "odd" [GCall "mult" [Var "x",Var "x"]])) freshVars ==
-        Variants [(("x",Pat "Z" []),GCall "odd" [C "Z" []]),(("x",Pat "S" ["v0"]),GCall "odd" [GCall "add" [Var "x",GCall "mult" [Var "v0",Var "x"]]])]
+        Variants [(("x",Pat "Z" []),GCall "odd" [C "Z" []]),(("x",Pat "S" ["v0"]),GCall "odd" [GCall "add" [C "S" [Var "v0"],GCall "mult" [Var "v0",C "S" [Var "v0"]]]])]
 
 --------------------------------------------------------------
 -- Folding.
@@ -437,3 +475,120 @@ generateTest = testCmpMatch && testCmpNotMatch
 
     testCmpMatch    = interpret (Prg defs $ sub [("s", toStr "BBBBBBBAAAAAAABBBBB")] e) == true
     testCmpNotMatch = interpret (Prg defs $ sub [("s", toStr "BBBBBBBBBBBBAAAAA")] e) == false
+
+
+--------------------------------------------------------------
+-- Generalizer.
+--------------------------------------------------------------
+
+class IsGeneralizer a where
+    generalize :: [Name] -> E -> (E, [Name])
+
+data SizeGeneralizer = SizeGeneralizer
+  deriving (Eq, Show)
+
+instance IsGeneralizer SizeGeneralizer where
+    generalize (n : ns) e | FCall f es <- e = (toLet (FCall f) $ splitArgs es, ns)
+                          | GCall f es <- e = (toLet (GCall f) $ splitArgs es, ns)
+      where
+        toLet :: ([E] -> E) -> (E, [E]) -> E
+        toLet f (e, es) = Let n e $ f es
+
+        splitArgs :: [E] -> (E, [E])
+        splitArgs args = (x, l <> [Var n] <> r)
+          where
+            maxArg     = maximumBy (compare `on` eSize') args
+            (l, x : r) = break (maxArg ==) args
+
+            eSize' :: E -> Int
+            eSize' Var{} = 0
+            eSize' e     = eSize e
+
+--------------------------------------------------------------
+-- Deforester.
+--------------------------------------------------------------
+
+deforest :: Graph E -> Graph E
+deforest cur@(Node e next) =
+  case next of
+    Decompose l          -> Node e $ Decompose $ fmap deforest l
+    Variants l           -> Node e $ Variants $ fmap (fmap deforest) l
+    Trans n | hasRec e n -> Node e $ Trans $ deforest n
+    Trans n              -> deforest n
+    _                    -> cur
+  where
+    hasRec :: E -> Graph E -> Bool
+    hasRec e (Node _ (Decompose l))        = or $ fmap (hasRec e) l
+    hasRec e (Node _ (Variants l))         = or $ fmap (hasRec e . snd) l
+    hasRec e (Node _ (Trans n))            = hasRec e n
+    hasRec e (Node _ (Fold _ (Node e' _))) = e == e'
+    hasRec _ _                             = False
+
+--------------------------------------------------------------
+-- Supercompiler.
+--------------------------------------------------------------
+
+class (IsWhistle (Whistle sc), IsGeneralizer (Generalizer sc)) => IsSupercompiler sc where
+    type Whistle sc
+    type Generalizer sc
+
+    supercompile :: Prg -> Prg
+    supercompile = superCompileOnce . superCompileOnce
+      where
+        superCompileOnce :: Prg -> Prg
+        superCompileOnce = generate . deforest . foldTree . (buildTree @sc)
+
+    buildTree :: Prg -> Graph E
+    buildTree (Prg defs expr) = helper [] expr freshVars
+      where
+        helper :: [E] -> E -> [Name] -> Graph E
+        helper prevs e ns | whistle @(Whistle sc) prevs e = helper prevs e' ns'
+          where
+            (e', ns') = generalize @(Generalizer sc) ns e
+        helper prevs e ns = res
+          where
+            driven   = drive (Prg defs e) ns
+            newPrevs = e : prevs
+
+            res = Node e $
+              case driven of
+                  Stop         -> Stop
+                  Decompose es -> Decompose $ fmap (flip (helper newPrevs) ns) es
+                  Trans e      -> Trans $ helper newPrevs e ns
+                  Variants l   -> Variants $ fmap (\(p@(n, Pat _ ns'), x) -> (p, helper newPrevs x $ ns `unusedNames` ns')) l
+
+
+data SizeSupercompiler = SizeSupercompiler
+  deriving (Eq, Show)
+
+instance IsSupercompiler SizeSupercompiler where
+  type Whistle SizeSupercompiler     = SizeWhistle
+  type Generalizer SizeSupercompiler = SizeGeneralizer
+
+sizeSupercompilerTest :: Bool
+sizeSupercompilerTest = testCmpMatch && testCmpNotMatch && showTest
+  where
+    prg@(Prg defs e) = supercompile @SizeSupercompiler $ cmpTestPrg (toStr "AAB") (Var "s")
+
+    testCmpMatch    = interpret (Prg defs $ sub [("s", toStr "BBBBBBBAAAAAAABBBBB")] e) == true
+    testCmpNotMatch = interpret (Prg defs $ sub [("s", toStr "BBBBBBBBBBBBAAAAA")] e) == false
+
+    showTest = show prg == "f0(s)\n  where\n    f0(s) = g1(s, s)\n    g1(StrNil, s) = False\n    g1(StrCons v0 v1, s) = g2(v0, v0, v1)\n    g2(A, v0, v1) = g3(v1, v1)\n    g2(B, v0, v1) = f0(v1)\n    g3(StrNil, v1) = False\n    g3(StrCons v2 v3, v1) = g4(v2, v2, v3)\n    g4(A, v2, v3) = g5(v3, v3)\n    g4(B, v2, v3) = f0(v3)\n    g5(StrNil, v3) = False\n    g5(StrCons v4 v5, v3) = g6(v4, v4, v5)\n    g6(B, v4, v5) = True\n    g6(A, v4, v5) = g5(v5, v5)"
+
+--------------------------------------------------------------
+-- Tests.
+--------------------------------------------------------------
+
+runAllTests :: IO ()
+runAllTests = do
+    True <- pure interpretTest
+    putStrLn "Interpret tests passed."
+
+    True <- pure driveTest
+    putStrLn "Drive tests passed."
+
+    True <- pure generateTest
+    putStrLn "Generate tests passed."
+
+    True <- pure sizeSupercompilerTest
+    putStrLn "Size supercompiler tests passed."
